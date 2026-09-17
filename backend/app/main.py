@@ -31,7 +31,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-    ] if settings.DEBUG else [settings.FRONTEND_URL] if settings.FRONTEND_URL else [],
+        "https://freelancerbot-1.onrender.com",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
