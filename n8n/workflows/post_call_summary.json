@@ -1,0 +1,71 @@
+{
+  "name": "FreelancerBot - Post Call Summary",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vapi-call-ended",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "name": "Vapi Call Ended Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract the transcript and call_id from Vapi's end-of-call-report payload\nconst body = items[0].json.body;\nconst transcript = body.transcript || (body.artifact && body.artifact.transcript) || '';\nconst callId = body.call && body.call.id;\nreturn [{ json: { transcript, call_id: callId } }];"
+      },
+      "name": "Extract Transcript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "message",
+        "model": "gpt-4o-mini",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Summarize this call transcript in 2-3 sentences for an internal dashboard. Focus on what the caller wanted, what was decided, and any follow-up needed."
+            },
+            {
+              "role": "user",
+              "content": "={{ $json.transcript }}"
+            }
+          ]
+        }
+      },
+      "name": "Generate AI Summary (OpenAI)",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.BACKEND_URL }}/webhooks/n8n",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "call_id", "value": "={{ $node['Extract Transcript'].json.call_id }}" },
+            { "name": "summary", "value": "={{ $json.message.content }}" }
+          ]
+        }
+      },
+      "name": "Store Summary in Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Vapi Call Ended Webhook": { "main": [[{ "node": "Extract Transcript", "type": "main", "index": 0 }]] },
+    "Extract Transcript": { "main": [[{ "node": "Generate AI Summary (OpenAI)", "type": "main", "index": 0 }]] },
+    "Generate AI Summary (OpenAI)": { "main": [[{ "node": "Store Summary in Backend", "type": "main", "index": 0 }]] }
+  }
+}
